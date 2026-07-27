@@ -53,6 +53,13 @@ formatada como data no Excel, número serial do Excel (quando a célula não
 está formatada como data), ou texto `dd/mm/aaaa`, `dd-mm-aaaa`, `aaaa-mm-dd`,
 `dd/mm/aa` ou `dd.mm.aaaa`.
 
+> **Sobre arquivos `.csv`:** o script detecta automaticamente a codificação
+> do arquivo (UTF-8, UTF-16 ou `cp1252`/Windows-1252 — este último é o
+> padrão quando o CSV é salvo pelo Excel em português) e também o separador
+> usado (`,`, `;` ou tabulação — o Excel em português normalmente usa `;`).
+> Não é necessário se preocupar com esses detalhes ao exportar a planilha
+> do Excel como CSV.
+
 ### 2. Log de processamento agora é SEMPRE gerado, mesmo em caso de erro
 
 Na v4.0, se qualquer erro inesperado ocorresse durante o processamento (por
