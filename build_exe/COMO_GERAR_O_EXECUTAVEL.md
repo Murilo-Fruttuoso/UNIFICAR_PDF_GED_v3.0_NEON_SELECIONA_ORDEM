@@ -24,11 +24,11 @@ pip install pypdf openpyxl Pillow pyinstaller
 
 ## 3. Gerar o executável
 
-Copie o arquivo `unificar_pdfs_v4.0_ND.py` (renomeie para `unificar_pdfs.py`,
+Copie o arquivo `unificar_pdfs_v5.0_ND.py` (renomeie para `unificar_pdfs.py`,
 ou ajuste o comando abaixo) para uma pasta e execute, dentro dessa pasta:
 
 ```
-pyinstaller --onefile --noconsole --name "UnificarPDFs_ND" --clean unificar_pdfs_v4.0_ND.py
+pyinstaller --onefile --noconsole --name "UnificarPDFs_ND" --clean unificar_pdfs_v5.0_ND.py
 ```
 
 O executável final será gerado em `dist\UnificarPDFs_ND.exe`.
@@ -50,6 +50,10 @@ Este executável foi compilado usando Wine (emulador de Windows em Linux)
 dentro do sandbox, com Python 3.11.9 (build Windows oficial) + PyInstaller
 6.21.0, arquitetura **win32** (compatível com Windows 32 e 64 bits). Os
 testes de fumaça (imports de `tkinter`, `pypdf`, `openpyxl`, `PIL`, e a
-execução completa da lógica de agrupamento por ND/geração de PDFs/log)
+execução completa da lógica de agrupamento por ND/data de pagamento,
+reconhecimento genérico de "Nota de débito" e geração garantida do log)
 foram validados com sucesso dentro do próprio ambiente Wine antes da
-entrega do binário.
+entrega do binário (v5.0 — recompilado para corrigir os 3 problemas
+relatados sobre a versão anterior: ordenação cross-código por data,
+log sempre gerado mesmo em erro fatal, e reconhecimento de notas de
+débito de qualquer marca).
