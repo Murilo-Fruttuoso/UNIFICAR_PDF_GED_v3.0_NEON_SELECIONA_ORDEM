@@ -7,6 +7,8 @@
   (mantida como referência/histórico — apresentava os 3 problemas corrigidos na v5.0, veja abaixo).
 - `unificar_pdfs_v5.0_ND.py` — **versão atual, recomendada.**
 
+O script lê uma base `.xlsx` com `ID`, `LANÇAMENTO`, `DATA DO PAGAMENTO` e `ND`, solicita as pastas por janelas e gera um log Excel estruturado.
+
 ## O que mudou na v5.0 (correções sobre a v4.0)
 
 A v5.0 corrige 3 problemas identificados no uso real da v4.0:
@@ -60,7 +62,7 @@ está formatada como data), ou texto `dd/mm/aaaa`, `dd-mm-aaaa`, `aaaa-mm-dd`,
 > Não é necessário se preocupar com esses detalhes ao exportar a planilha
 > do Excel como CSV.
 
-### 2. Log de processamento agora é SEMPRE gerado, mesmo em caso de erro
+### 2. Log de processamento XLSX sempre gerado, mesmo em caso de erro
 
 Na v4.0, se qualquer erro inesperado ocorresse durante o processamento (por
 exemplo, um PDF corrompido, uma planilha com formato inesperado, etc.), o
@@ -71,9 +73,8 @@ nem tinha um log para diagnosticar o problema.
 Na v5.0, toda a lógica principal roda dentro de um bloco protegido: se
 ocorrer qualquer erro fatal, o script:
 - Captura o erro completo (traceback);
-- **Ainda assim gera o arquivo de log** na pasta de saída, com uma seção
-  extra no topo chamada `ERRO FATAL - O PROCESSAMENTO FOI INTERROMPIDO`
-  contendo o detalhamento técnico do problema;
+- **Ainda assim gera o arquivo de log XLSX** na pasta de saída, com a aba `Resumo`
+  indicando `ERRO FATAL` e contendo o detalhamento técnico do problema;
 - Mostra uma mensagem na tela avisando que houve erro e indicando o caminho
   exato do log gerado.
 
@@ -81,7 +82,7 @@ Ou seja: **o log é sempre criado**, tanto em execuções bem-sucedidas quanto
 em execuções que falharam, e também nos casos em que a operação é
 cancelada pelo usuário ou nenhum PDF válido é encontrado na pasta.
 
-O log continua contendo:
+O log XLSX contém as abas `Resumo`, `Arquivos gerados`, `Avisos` e `Ignorados`, com:
 - Resumo geral (quantos PDFs foram lidos, gerados, ignorados, avisos);
 - Lista de todos os PDFs gerados, com o ND correspondente e os arquivos que
   foram unidos em cada um (na ordem exata em que entraram no PDF);
@@ -106,17 +107,13 @@ saída.
 
 O arquivo final é nomeado como:
 ```
-<mesmo prefixo do arquivo de nota encontrado> ND <número>-<ano atual>.pdf
+Nota de débito - Neon Pagamentos ND <número>.pdf
 ```
 
 Exemplos:
-- `Nota de débito - Neon Consiga+ ND 1266.pdf` (nota encontrada na pasta,
-  vinculada ao ND 1266 na planilha) → gera
-  `Nota de débito - Neon Consiga+ ND 1266-2026.pdf`
-- `Nota de débito - Neon Consiga+ ND 1267.pdf` → gera
-  `Nota de débito - Neon Consiga+ ND 1267-2026.pdf`
-- `Nota de débito - Neon Pagamentos ND 1262.pdf` → gera
-  `Nota de débito - Neon Pagamentos ND 1262-2026.pdf`
+- ND 1266 → gera `Nota de débito - Neon Pagamentos ND 1266.pdf`
+- ND 1267 → gera `Nota de débito - Neon Pagamentos ND 1267.pdf`
+- ND 1262 → gera `Nota de débito - Neon Pagamentos ND 1262.pdf`
 
 **Importante:** o número usado no nome final (`1266`, `1267`, `1262`, etc.)
 é sempre o valor da coluna `ND` da planilha de base, **não** o número que

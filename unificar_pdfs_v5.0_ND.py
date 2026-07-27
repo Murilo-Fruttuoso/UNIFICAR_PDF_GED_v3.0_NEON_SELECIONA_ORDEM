@@ -58,7 +58,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 
 from pypdf import PdfReader, PdfWriter
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils.datetime import from_excel
 from PIL import Image
 
@@ -106,7 +107,7 @@ def selecionar_entrada_saida_e_base():
     return Path(entrada), Path(saida), Path(base)
 
 
-def perguntar_ordem_popup(letras):
+def perguntar_ordem_popup(letras_detectadas):
     root = tk.Tk()
     root.withdraw()
 
@@ -114,13 +115,31 @@ def perguntar_ordem_popup(letras):
 
     ordem = simpledialog.askstring(
         "Ordem dos PDFs",
-        f"Letras encontradas: {letras_str}\n\nDigite a ordem (ex: C,G,A):"
+        f"Letras encontradas: {letras_str}\n\nDigite a ordem (ex: C,G,A ou CGA):"
     )
 
     if not ordem:
         return None
 
-    return [x.strip().upper() for x in ordem.split(",") if x.strip()]
+    # Aceita tanto "A,B,C" quanto "ABC", removendo separadores e espaços.
+    partes = [x.strip().upper() for x in re.split(r"[,;\s]+", ordem) if x.strip()]
+    letras = []
+    for parte in partes:
+        letras.extend(list(parte))
+
+    letras = list(dict.fromkeys(letras))
+    ausentes = sorted(set(letras) ^ set(letras_detectadas))
+    if set(letras) != set(letras_detectadas):
+        messagebox.showwarning(
+            "Ordem incompleta",
+            "Informe todas as letras encontradas, sem repetir.\n"
+            f"Encontradas: {letras_str}\n"
+            f"Informadas: {', '.join(letras) if letras else '(nenhuma)'}\n"
+            f"Divergências: {', '.join(ausentes)}"
+        )
+        return None
+
+    return letras
 
 
 # ============================================================
@@ -469,8 +488,9 @@ def obter_nome_saida(codigo, arquivos, mapa):
     return codigo
 
 
-def montar_nome_nota_unificada(prefixo, nd_original, ano):
-    return f"{sanitizar(prefixo)} ND {sanitizar(nd_original)}-{ano}"
+def montar_nome_nota_unificada(nd_original):
+    """Nome padronizado solicitado para cada nota de débito por ND."""
+    return f"Nota de débito - Neon Pagamentos ND {sanitizar(nd_original)}"
 
 
 # ============================================================
@@ -659,8 +679,6 @@ def processar(grupos, notas_arquivo, mapa, pasta_saida, ordem_usuario, ignorados
     avisos = []
     gerados = []
     codigos_processados = set()
-    ano_atual = datetime.now().year
-
     grupos_nd = montar_grupos_nd(mapa)
 
     # ------------------------------------------------------------------
@@ -728,7 +746,7 @@ def processar(grupos, notas_arquivo, mapa, pasta_saida, ordem_usuario, ignorados
         try:
             comprimir_pdf(writer)
 
-            nome_final = montar_nome_nota_unificada(prefixo_nota, nd_original, ano_atual)
+            nome_final = montar_nome_nota_unificada(nd_original)
             destino = nome_unico(pasta_saida / f"{nome_final}.pdf")
             salvar_pdf_comprimido(writer, destino)
 
@@ -793,69 +811,68 @@ def processar(grupos, notas_arquivo, mapa, pasta_saida, ordem_usuario, ignorados
 # ============================================================
 # Log
 # ============================================================
+def _formatar_valor_log(valor):
+    if isinstance(valor, (list, tuple)):
+        return " | ".join(str(item) for item in valor)
+    return "" if valor is None else str(valor)
+
+
+def _estilizar_planilha(ws):
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for celula in ws[1]:
+        celula.font = Font(bold=True, color="FFFFFF")
+        celula.fill = PatternFill("solid", fgColor="1F4E78")
+    for coluna in ws.columns:
+        largura = min(max(len(_formatar_valor_log(c.value)) for c in coluna) + 2, 80)
+        ws.column_dimensions[coluna[0].column_letter].width = max(largura, 12)
+
+
 def gerar_log(pasta_saida, gerados, ignorados, avisos, total_lidos, erro_fatal=None):
+    """Gera um log XLSX estruturado, inclusive quando há erro fatal."""
     agora = datetime.now()
-    caminho_log = pasta_saida / f"LOG_processamento_{agora.strftime('%Y%m%d_%H%M%S')}.txt"
+    caminho_log = pasta_saida / f"LOG_processamento_{agora.strftime('%Y%m%d_%H%M%S')}.xlsx"
+    wb = Workbook()
 
-    linhas = []
-    linhas.append("=" * 72)
-    linhas.append("LOG DE PROCESSAMENTO - UNIFICAÇÃO DE PDFs / NOTAS DE DÉBITO")
-    linhas.append(f"Data/Hora: {agora.strftime('%d/%m/%Y %H:%M:%S')}")
-    linhas.append("=" * 72)
-    linhas.append("")
-
+    ws = wb.active
+    ws.title = "Resumo"
+    ws.append(["Informação", "Valor"])
+    ws.append(["Data/Hora", agora.strftime("%d/%m/%Y %H:%M:%S")])
+    ws.append(["Arquivos PDF lidos", total_lidos])
+    ws.append(["PDFs unificados gerados", len(gerados)])
+    ws.append(["Arquivos ignorados", len(ignorados)])
+    ws.append(["Avisos", len(avisos)])
+    ws.append(["Status", "ERRO FATAL" if erro_fatal else "Concluído"])
     if erro_fatal:
-        linhas.append("ERRO FATAL - O PROCESSAMENTO FOI INTERROMPIDO")
-        linhas.append("-" * 72)
-        linhas.append(erro_fatal)
-        linhas.append("")
+        ws.append(["Detalhes do erro fatal", erro_fatal])
+    _estilizar_planilha(ws)
 
-    linhas.append("RESUMO GERAL")
-    linhas.append("-" * 72)
-    linhas.append(f"Arquivos PDF lidos na pasta de entrada .......... {total_lidos}")
-    linhas.append(f"PDFs unificados gerados (por ND ou individual) .. {len(gerados)}")
-    linhas.append(f"Arquivos possivelmente ignorados ................ {len(ignorados)}")
-    linhas.append(f"Avisos gerados durante o processamento .......... {len(avisos)}")
-    linhas.append("")
+    ws_gerados = wb.create_sheet("Arquivos gerados")
+    ws_gerados.append(["Arquivo de saída", "ND", "Páginas", "Quantidade de arquivos", "Arquivos unidos (na ordem)"])
+    for item in gerados:
+        ws_gerados.append([
+            item["arquivo"], item["nd"], item["paginas"], item["qtd_arquivos"],
+            _formatar_valor_log(item["incluidos"]),
+        ])
+    _estilizar_planilha(ws_gerados)
 
-    linhas.append("ARQUIVOS GERADOS")
-    linhas.append("-" * 72)
-    if gerados:
-        for g in gerados:
-            rotulo_nd = f"ND {g['nd']}" if g["nd"] else "sem ND (individual)"
-            linhas.append(
-                f"- {g['arquivo']}  [{rotulo_nd} | {g['paginas']} página(s) | "
-                f"{g['qtd_arquivos']} arquivo(s) unidos]"
-            )
-            for nome_incluido in g["incluidos"]:
-                linhas.append(f"    • {nome_incluido}")
-    else:
-        linhas.append("(nenhum arquivo foi gerado)")
-    linhas.append("")
+    ws_avisos = wb.create_sheet("Avisos")
+    ws_avisos.append(["Aviso"])
+    for aviso in avisos:
+        ws_avisos.append([aviso])
+    if not avisos:
+        ws_avisos.append(["Nenhum aviso"])
+    _estilizar_planilha(ws_avisos)
 
-    linhas.append("AVISOS")
-    linhas.append("-" * 72)
-    if avisos:
-        for a in avisos:
-            linhas.append(f"- {a}")
-    else:
-        linhas.append("(nenhum aviso)")
-    linhas.append("")
+    ws_ignorados = wb.create_sheet("Ignorados")
+    ws_ignorados.append(["Arquivo", "Motivo"])
+    for nome, motivo in ignorados:
+        ws_ignorados.append([nome, motivo])
+    if not ignorados:
+        ws_ignorados.append(["Nenhum arquivo ignorado", ""])
+    _estilizar_planilha(ws_ignorados)
 
-    linhas.append("ARQUIVOS POSSIVELMENTE IGNORADOS")
-    linhas.append("-" * 72)
-    if ignorados:
-        for nome, motivo in ignorados:
-            linhas.append(f"- {nome}")
-            linhas.append(f"    Motivo: {motivo}")
-    else:
-        linhas.append("(nenhum arquivo foi ignorado)")
-    linhas.append("")
-
-    linhas.append("=" * 72)
-    linhas.append("Fim do log.")
-
-    caminho_log.write_text("\n".join(linhas), encoding="utf-8")
+    wb.save(caminho_log)
     return caminho_log
 
 
