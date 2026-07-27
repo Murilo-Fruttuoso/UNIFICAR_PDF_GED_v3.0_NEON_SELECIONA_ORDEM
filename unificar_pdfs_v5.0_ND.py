@@ -288,11 +288,54 @@ def detectar_colunas(linha_cabecalho):
     return mapeamento
 
 
+def _ler_texto_csv(caminho):
+    """
+    Lê o conteúdo de um .csv tentando várias codificações comuns, já que
+    o CSV pode ter sido exportado pelo Excel/Windows em português (que
+    normalmente NÃO gera UTF-8, e sim 'cp1252'/'latin-1' ou, mais raro,
+    'utf-16'). Tenta na ordem: utf-8-sig, utf-8, cp1252, latin-1.
+    """
+    dados = caminho.read_bytes()
+
+    # UTF-16 (Excel "CSV UTF-16" / "Unicode Text") tem BOM característico.
+    if dados[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return dados.decode("utf-16")
+
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            return dados.decode(enc)
+        except UnicodeDecodeError:
+            continue
+
+    # último recurso: nunca falha, mas pode substituir caracteres inválidos
+    return dados.decode("utf-8", errors="replace")
+
+
+def _detectar_delimitador_csv(texto):
+    """
+    Detecta o separador usado no CSV (',', ';' ou tabulação - o Excel em
+    português normalmente exporta CSV separado por ';'). Usa csv.Sniffer
+    como primeira tentativa e cai para contagem de caracteres na primeira
+    linha caso o Sniffer não consiga decidir.
+    """
+    amostra = "\n".join(texto.splitlines()[:5])
+    try:
+        return csv.Sniffer().sniff(amostra, delimiters=",;\t").delimiter
+    except csv.Error:
+        pass
+
+    primeira_linha = texto.splitlines()[0] if texto.splitlines() else ""
+    contagens = {d: primeira_linha.count(d) for d in (";", ",", "\t")}
+    delimitador = max(contagens, key=contagens.get)
+    return delimitador if contagens[delimitador] > 0 else ","
+
+
 def _linhas_planilha(caminho):
     if caminho.suffix.lower() == ".csv":
-        with open(caminho, encoding="utf-8-sig") as f:
-            reader = csv.reader(f)
-            return [list(row) for row in reader if any(c not in (None, "") for c in row)]
+        texto = _ler_texto_csv(caminho)
+        delimitador = _detectar_delimitador_csv(texto)
+        reader = csv.reader(io.StringIO(texto), delimiter=delimitador)
+        return [list(row) for row in reader if any(c not in (None, "") for c in row)]
 
     wb = load_workbook(caminho, data_only=True)
     ws = wb.active
