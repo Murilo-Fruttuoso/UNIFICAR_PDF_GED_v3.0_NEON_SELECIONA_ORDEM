@@ -56,7 +56,20 @@
      do padrão esperado, nota de débito cujo ND não consta na base, nota
      duplicada para o mesmo ND).
 
-## Como executar
+## Executável (.exe) — rodar em qualquer máquina Windows sem instalar Python
+
+Já existe um executável pronto em `dist/UnificarPDFs_ND.exe`. Basta copiar
+esse único arquivo para qualquer computador Windows (32 ou 64 bits) e dar
+duplo clique — não é necessário instalar Python nem nenhuma dependência.
+
+Ele abre as mesmas janelas gráficas do script (pasta de entrada, pasta de
+saída, base de nomenclatura e, se necessário, a ordem das letras) e gera os
+PDFs unificados + o log, exatamente como a versão Python.
+
+Para gerar o `.exe` novamente após alterar o script, veja as instruções em
+`build_exe/COMO_GERAR_O_EXECUTAVEL.md`.
+
+## Como executar via Python (alternativa ao .exe)
 
 ```bash
 python3 unificar_pdfs_v4.0_ND.py
